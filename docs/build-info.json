@@ -1,0 +1,264 @@
+{
+  "built_at": "2026-11-25T18:01:01+0800",
+  "builder": "apply-all-plus-features.py",
+  "manifest_version": "2.8.31.16",
+  "version_name": "2.8.31.16(Beta) unlock r4",
+  "source_zip": {
+    "path": "D:\\AI-Project\\逆向统一\\acghelper\\acg-helper-2.8.31.16.zip",
+    "sha256": "840455e6b71e1e33b381ae98b86cc3b5bb57500f8a66469a3f6a98e4b4d94703",
+    "size": 3695459
+  },
+  "source_dir": {
+    "path": "D:\\AI-Project\\逆向统一\\acghelper\\src\\extracted",
+    "sha256_tree": "00c27453332a0e1b42494f45e4efb182f6609eb1dc215f4cc5f5232ec317ac58",
+    "unchanged_before_after": true
+  },
+  "patch_counts": {
+    "static": 10,
+    "proto": 23,
+    "extra": 5,
+    "feature": 29,
+    "feature_by_name": {
+      "pgc-fix": 4,
+      "dash-auth-fix": 8,
+      "dash-fallback": 5,
+      "webdav": 9,
+      "batch": 3
+    },
+    "optional_applied": 0,
+    "optional_available": 2,
+    "optional_skipped": [],
+    "applied": 67,
+    "expected_total": 67,
+    "added_files": 8,
+    "expected_added_files": 8
+  },
+  "totals": {
+    "base": {
+      "static": 10,
+      "proto": 23,
+      "extra": 5,
+      "optional_applied": 0,
+      "optional_available": 2,
+      "sum_base": 38
+    },
+    "feature": {
+      "pgc-fix": {
+        "declared": 4,
+        "bytes_patches": 4,
+        "added_files": 0
+      },
+      "dash-auth-fix": {
+        "declared": 8,
+        "bytes_patches": 8,
+        "added_files": 0
+      },
+      "dash-fallback": {
+        "declared": 5,
+        "bytes_patches": 5,
+        "added_files": 0
+      },
+      "webdav": {
+        "declared": 9,
+        "bytes_patches": 3,
+        "added_files": 6
+      },
+      "batch": {
+        "declared": 3,
+        "bytes_patches": 3,
+        "added_files": 2
+      }
+    },
+    "feature_sum": 29,
+    "total_from_spec": 67,
+    "total_applied": 67,
+    "formula": "38 + pgc-fix=4 + dash-auth-fix=8 + dash-fallback=5 + webdav=9 + batch=3 = 67",
+    "new_files_from_spec": 8,
+    "new_files_applied": 8,
+    "bridge_steps": 3,
+    "bridge_note": "bridge 只是把 pristine 补成 webdav v2 规格声明的 v1 前置态，不计入补丁条数"
+  },
+  "webdav_bridge": [
+    {
+      "id": "WBR1",
+      "stage": "feature:webdav:bridge",
+      "file": "html/config.html",
+      "offset_in_file": 522,
+      "offset_in_stage_input": 522,
+      "old_len": 7,
+      "new_len": 140,
+      "why": "v1 前置态：</body> 前补回 v1 的注释 + inject.js（W1.old 反推）",
+      "old_head": "</body>",
+      "new_head": "<!-- WebDAV 云同步入口：右下角浮动按钮，点击新标签打开 html/webdav.html -->\n<script type=\"text/javasc"
+    },
+    {
+      "id": "WBR2",
+      "stage": "feature:webdav:bridge",
+      "file": "manifest.json",
+      "offset_in_file": 7720,
+      "offset_in_stage_input": 7720,
+      "old_len": 38,
+      "new_len": 138,
+      "why": "v1 前置态：host_permissions 末项后补回 infini-cloud + optional_host_permissions（W2.old 反推）",
+      "old_head": "        \"*://*.akamaized.net/*\"\n    ],",
+      "new_head": "        \"*://*.akamaized.net/*\",\n        \"https://*.infini-cloud.net/*\"\n    ],\n "
+    },
+    {
+      "id": "WBR3",
+      "stage": "feature:webdav:bridge",
+      "file": "initBackground.sw.js",
+      "offset_in_file": 839541,
+      "offset_in_stage_input": 839541,
+      "old_len": 54,
+      "new_len": 266,
+      "why": "v1 前置态：SW 尾部补回 importScripts 引导块（W3.old 反推）",
+      "old_head": "var __webpack_exports__=__webpack_require__(5809)})();",
+      "new_head": "var __webpack_exports__=__webpack_require__(5809)})();\n;(function(){try{if(self."
+    }
+  ],
+  "feature_ids": {
+    "pgc-fix": [
+      "F4",
+      "F3",
+      "F2",
+      "F1"
+    ],
+    "dash-auth-fix": [
+      "F8",
+      "F7",
+      "F2",
+      "F1",
+      "F4",
+      "F5",
+      "F3",
+      "F6"
+    ],
+    "dash-fallback": [
+      "DF4",
+      "DF5",
+      "DF2",
+      "DF1",
+      "DF3"
+    ],
+    "webdav": [
+      "W1-config-html",
+      "W3-sw-bootstrap",
+      "W2-manifest-hostperm",
+      "W0-html",
+      "W0-core",
+      "W0-panel",
+      "W0-page",
+      "W0-sw",
+      "W0-inject-legacy"
+    ],
+    "batch": [
+      "FB2",
+      "FB3",
+      "FB1"
+    ]
+  },
+  "added_files": [
+    {
+      "feature": "webdav",
+      "id": "W0-html",
+      "counted_in_patches": true,
+      "src": "src/addons/webdav/html/webdav.html",
+      "to": "html/webdav.html",
+      "bytes": 8649,
+      "sha256": "c62e6857575a2e6bcc03b48efbd34c5f70b8909f4663acf09ad0af10a3b074fa"
+    },
+    {
+      "feature": "webdav",
+      "id": "W0-core",
+      "counted_in_patches": true,
+      "src": "src/addons/webdav/js/webdav-core.js",
+      "to": "src/addons/webdav/js/webdav-core.js",
+      "bytes": 46574,
+      "sha256": "e97e24b25338ebf448266250f0899f8702d156edf825681f4ff1051e6b3a9a64"
+    },
+    {
+      "feature": "webdav",
+      "id": "W0-panel",
+      "counted_in_patches": true,
+      "src": "src/addons/webdav/js/webdav-settings-panel.js",
+      "to": "src/addons/webdav/js/webdav-settings-panel.js",
+      "bytes": 57995,
+      "sha256": "c2361502cd33f4d989fa5574656b2a24b1b29206975d844f1b2b9216c47d2cf9"
+    },
+    {
+      "feature": "webdav",
+      "id": "W0-page",
+      "counted_in_patches": true,
+      "src": "src/addons/webdav/js/webdav.js",
+      "to": "src/addons/webdav/js/webdav.js",
+      "bytes": 13649,
+      "sha256": "ed760ddeeac5c34e9384025f8b59ba0b191607d9b8fb67d07545dcfd0f9b42a4"
+    },
+    {
+      "feature": "webdav",
+      "id": "W0-sw",
+      "counted_in_patches": true,
+      "src": "src/addons/webdav/js/webdav-sw.js",
+      "to": "src/addons/webdav/js/webdav-sw.js",
+      "bytes": 2145,
+      "sha256": "c6dc46ff94f2ee116e784587922bb8f365842637899df70eb2f9ee3e51316337"
+    },
+    {
+      "feature": "webdav",
+      "id": "W0-inject-legacy",
+      "counted_in_patches": true,
+      "src": "src/addons/webdav/inject.js",
+      "to": "src/addons/webdav/inject.js",
+      "bytes": 4003,
+      "sha256": "d8deac6b6eee4d38fc828688e78b7657278df5613f6326515baeaaa9e60d78e1"
+    },
+    {
+      "feature": "batch",
+      "id": "batch-add1",
+      "counted_in_patches": false,
+      "src": "src/addons/batch/js/pages/acgx-batch.js",
+      "to": "js/pages/acgx-batch.js",
+      "bytes": 49447,
+      "sha256": "93e1a6c78c7dd6570b7fd1d41d69aa8dc2aa37a2e2b630a7f337acb2164232a3"
+    },
+    {
+      "feature": "batch",
+      "id": "batch-add2",
+      "counted_in_patches": false,
+      "src": "src/addons/batch/js/pages/acgx-batch-offscreen.js",
+      "to": "js/pages/acgx-batch-offscreen.js",
+      "bytes": 14571,
+      "sha256": "63d052d8fa0fc3f17414b63d80b43de2f00be5fc273703b39c54952373f6563f"
+    }
+  ],
+  "with_optional": false,
+  "skipped_features": [],
+  "toolchain": {
+    "python": "3.12.10",
+    "node": "v24.21.0",
+    "chrome": "157.0.8103.79"
+  },
+  "products": [
+    {
+      "name": "ACGhelper-2.8.31.16-unlock",
+      "dir": "D:\\AI-Project\\逆向统一\\acghelper\\output\\ACGhelper-2.8.31.16-unlock",
+      "tree_sha256": "d6b552bdc9128ad440674ec58225aedaca91035276de288a6880dbf29ef88122",
+      "zip": "D:\\AI-Project\\逆向统一\\acghelper\\output\\ACGhelper-2.8.31.16-unlock.zip",
+      "zip_size": 3748433,
+      "zip_sha256": "df293468eb33cc4dd85885f65fe08bec62af3a54bdb21de6d50a984ec5594baf",
+      "key_injected": false,
+      "extension_id": "(derived by Chrome, random)"
+    },
+    {
+      "name": "ACGhelper-2.8.31.16-unlock-sameId",
+      "dir": "D:\\AI-Project\\逆向统一\\acghelper\\output\\ACGhelper-2.8.31.16-unlock-sameId",
+      "tree_sha256": "fc082c57c3ce526da36c1074dd334c76b8c5fec23a060cb1912b9d2881b3e8ab",
+      "zip": "D:\\AI-Project\\逆向统一\\acghelper\\output\\ACGhelper-2.8.31.16-unlock-sameId.zip",
+      "zip_size": 3748644,
+      "zip_sha256": "91aa2e44f389acc8b19c1626a3a2450da96c98ae59337ef483fcd50187339672",
+      "key_injected": true,
+      "extension_id": "kpbnombpnpcffllnianjibmpadjolanh",
+      "key_matches_storefront": true
+    }
+  ]
+}

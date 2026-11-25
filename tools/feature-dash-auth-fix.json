@@ -1,0 +1,94 @@
+{
+  "_meta": {
+    "name": "DASH 音轨-only（选项串丢 video 段）与 PGC 授权/试看可见性修复",
+    "generated_by": "dynamic 角色 headless Chrome 实测（CDP Extensions.loadUnpacked + SW webRequest 头探针 + 真下载产物 ffprobe）",
+    "apply_base": "output/ACGhelper-2.8.31.16-unlock（static 10 + proto 23 + extra 5 = 38 条成品树）",
+    "scope": "js/pages/background.js（DASH/FLV 下载器与 playurl 包装）+ initBackground.sw.js（SW 侧 playurl 包装）。不触碰 VIP/授权层、不改 tools/feature-pgc-fix.json 与既有应用器",
+    "anchor_policy": "每条 old 在 38 条成品树的目标文件内 count==1；tools/apply-feature-dash-auth-fix.py 强制校验",
+    "measured_rootcause_doc": "docs/dash-audio-only-and-pgc-auth.md",
+    "verifier": "tools/verify-pgc-merge.mjs（不回归）+ build/dash-auth-test/probe.mjs（真下载 ffprobe 前后对比）"
+  },
+
+  "patches": [
+    {
+      "id": "F1",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "downloadDash 里 this.filename=m 之后、picker/streamsaver 分支之前（成品树 off≈63900）",
+      "old": "if(this.filename=m,this.needStop=!1,this.stopping=!1,p=o.useStreamSaver?",
+      "new": "if(this.filename=!s.video&&s.audio&&/\\.mp4$/i.test(m||\"\")?m.replace(/\\.mp4$/i,\"\")+\".m4a\":m,this.needStop=!1,this.stopping=!1,p=o.useStreamSaver?",
+      "why": "问题 A 的用户可见侧根因。downloadDash 的选项 s=X(r,e) 只有 audio 没有 video 时（downloadOptionIndex 的 video 段为空，实测字符串 \",0-0-0\"），整条链路照常 running → downloadCompleted，产物是只有一条 aac 流的 mp4，而文件名仍是 .mp4、picker 类型仍是 video/mp4，用户读作「4K 视频下好了」。此处按实际轨道集改写扩展名：仅音频 → .m4a。只改命名，不改下载行为（「仅下载音频」功能保持可用）。",
+      "verify": "node build/dash-auth-test/probe.mjs --step=download --index=\",0-0-0\" → 修前落盘 video-plus/audio-only.mp4 且 ffprobe streams=[audio:aac]；修后落盘 audio-only.m4a 且 ffprobe streams=[audio:aac]"
+    },
+    {
+      "id": "F2",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "downloadDash 的 showSaveFilePicker accept 列表（成品树 off≈64000）",
+      "old": "types:[{accept:{[\"video/mp4\"]:[\".mp4\"]}}]",
+      "new": "types:[{accept:s.video?{[\"video/mp4\"]:[\".mp4\"]}:{[\"audio/mp4\"]:[\".m4a\"]}}]",
+      "why": "与 F1 同一条链的保存对话框类型。修前无论实际轨道集如何都声明 video/mp4 + .mp4，配合 F1 让「音轨-only 产物」在系统层面被标注成视频文件。修后按 s.video 决定 accept 类型。",
+      "verify": "node --check js/pages/background.js；probe --step=download 两种 index 各跑一次，picker accept 与产物扩展名一致"
+    },
+    {
+      "id": "F3",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "X()（downloadOptionIndex 解析器，成品树 off≈16031）",
+      "old": "let o={video:null,audio:null};if(s?.length===i&&e.video.length>0){",
+      "new": "let o={video:null,audio:null};if(s?.length!==i&&\"\"!==n)throw new Error(\"invalid option\");if(s?.length===i&&e.video.length>0){",
+      "why": "静默降级的入口。X(e,t) 把 \"<video>,<audio>\" 两段各自 split('-') 后 filter(!isNaN)；视频段只要不是「恰好 3 个数字」就得到空数组，随后 `if(s?.length===i&&e.video.length>0)` 直接跳过 → video:null → track.video=false → initSegmentInfo 不取 video init、initHeadData 走单轨分支，最终写出只有音轨的 mp4 且全程无错误。实测：index=\"0-0-0,0-0-0\" 在 dash.video 只有 32/16 的视频上会抛 TypeError（children 空），而 index=\",0-0-0\" 直接成功产出 audio-only。修法：视频段「非空但解析不出 3 个数字」= 调用方给的是坏索引（旧版本残留 / 拼接错误），直接 invalid option 报错；视频段为空（\"\"，即 UI 的「仅下载音频」）保持原行为，功能不受影响。",
+      "verify": "probe --step=download --index=\"abc,0-0-0\" → 修前 downloadCompleted + audio-only 产物；修后 downloadError「invalid option」且 sink 0 字节。--index=\",0-0-0\" 修后仍可下（仅改名 .m4a）"
+    },
+    {
+      "id": "F4",
+      "priority": "P1",
+      "file": "js/pages/background.js",
+      "anchor_hint": "downloadDash 的 renameDownloadFile 入参对象（成品树 off≈63800）",
+      "old": "const d={aid:this.aid,bvid:this.bvid,cid:this.cid,title:this.basicInfo.title,quality:s?.video?.quality||s?.audio?.quality",
+      "new": "const d={aid:this.aid,bvid:this.bvid,cid:this.cid,title:this.basicInfo.title+((this.isPreview||this.basicDownloadInfo&&this.basicDownloadInfo.isPreview)?\"[\\u8bd5\\u770b]\":\"\"),quality:s?.video?.quality||s?.audio?.quality",
+      "why": "问题 B 的可观测性。实测 PGC 的 playurl 回包在「无该集权益」时是 code=0 / play_check=PLAY_PREVIEW / is_preview=1 / 仅 durl（VIP 集 ep826498 三次取样完全一致，与本机是否带 Referer、是否带假 SESSDATA 无关），扩展侧 Cookie 是带出去的（实测带 acgprobe/buvid3/b_nut）。也就是说这类回包是站方权益判定，下载器拿到的是「试看片段」。修前它被当成整集写盘、文件名毫无区别。这里在文件名上打 [试看] 标记（isPreview 由 SW 的 videoParse 结果 Object.assign 到下载器上），让「拿到的是试看」不再静默。",
+      "verify": "probe --step=auth 抓 VIP 集 parse.isPreview=true；随后 download 该集，产物名含 [试看]"
+    },
+    {
+      "id": "F5",
+      "priority": "P1",
+      "file": "js/pages/background.js",
+      "anchor_hint": "downloadFLV 的 renameDownloadFile 入参对象（成品树 off≈63000）",
+      "old": "const s={aid:this.aid,bvid:this.bvid,cid:this.cid,title:this.basicInfo.title,quality:r,owner:this.basicInfo.user,format:\"flv\"",
+      "new": "const s={aid:this.aid,bvid:this.bvid,cid:this.cid,title:this.basicInfo.title+((this.isPreview||this.basicDownloadInfo&&this.basicDownloadInfo.isPreview)?\"[\\u8bd5\\u770b]\":\"\"),quality:r,owner:this.basicInfo.user,format:\"flv\"",
+      "why": "与 F4 同一诉求的另一条分支：PGC 的试看回包是 durl+format=mp4，走 L() 的 isFLV=durl&&!dash 判定 → downloadFLV，实测 39/180 的采样全落在这一支。同一批 [试看] 标记必须覆盖它，否则问题 B 的主要形态（durl 试看）仍然静默。",
+      "verify": "用 PGC VIP 集（durl 形态）跑 download，产物名含 [试看]；FLV 真视频源（durl 真 FLV）行为不变"
+    },
+    {
+      "id": "F6",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "B() 里的 playurl 请求（offscreen 侧刷新/换画质，成品树 off≈10886）",
+      "old": "d=await A(o).then(",
+      "new": "d=await A(o,{credentials:\"include\"}).then(",
+      "why": "把 playurl 的鉴权意图写成显式契约。实测（Chrome 156，Extensions.loadUnpacked）扩展 fetch 到 api.bilibili.com 目前确实会带 Cookie（chrome.webRequest.onBeforeSendHeaders + extraHeaders 抓到 `acgprobe=probe1; buvid3=…; b_nut=…`），所以 B 不是「没带 Cookie」；但 fetch 规范默认 credentials=same-origin，这条请求能带 Cookie 完全依赖 Chrome 对「扩展发往 host_permissions 命中域」的特殊处理。一旦该处理变化、或请求从别的上下文发起，鉴权会静默丢失且表现为「突然只给试看」。显式 include 让行为不再依赖隐式策略；实测加 include 后 CORS 不拦（扩展 origin + host_permissions 不触发预检）、回包照常解析。",
+      "verify": "probe --step=auth → B-PGC/OFF-FETCH 的 playurl 请求仍带 Cookie 且 parse ok（isPGC=true、回包 code=0）；off 侧 fetch patch 记录 credentials='include'"
+    },
+    {
+      "id": "F7",
+      "priority": "P0",
+      "file": "initBackground.sw.js",
+      "anchor_hint": "Yt() 里的 playurl 请求（SW 侧首次解析，成品树 off≈540500）",
+      "old": "const l=await At(r,a).then(",
+      "new": "const l=await At(r,{credentials:\"include\"}).then(",
+      "why": "同 F6，但这条是 videoParse 首次解析的主路径（At(r,a) 里 a=null，等于 fetch(url,null)）。实测 SW 侧 fetch 目前也带 Cookie，加 include 后仍带且回包正常；这条主路径与 F6 都改成显式鉴权后，疑似的「Cookie 丢失」类故障不再可能从这两处发生。",
+      "verify": "probe --step=auth → UGC/PGC 三种 case 的 playurl 请求 hasCookie=true 且 parse ok"
+    },
+    {
+      "id": "F8",
+      "priority": "P1",
+      "file": "initBackground.sw.js",
+      "anchor_hint": "Yt() 的 playurl 解析链 .then(Ft)（成品树 off≈540700）",
+      "old": ").then(Ft).catch((e=>{throw e}));if(!l)return null;",
+      "new": ").then((_vi=>{const _m=Ft(_vi);try{_m.isPreview=e&&!!(_vi&&(_vi.is_preview===1||_vi.is_preview===!0))}catch(_e){}return _m})).catch((e=>{throw e}));if(!l)return null;",
+      "why": "F4/F5 依赖的 isPreview 在 PGC 上原本是空的：实测 ep826498 / ep826497 的 videoParse 结果里 isPreview 为 undefined（Kt.isPreview 只由 UGC 的 Rt() 从 is_upower_preview 赋值，PGC 的 Ct() 不赋值），而 playurl 回包里 video_info.is_preview 是有的（试看=1、整集=0）。这里在 SW 侧把 video_info.is_preview 归一化成 basicDownloadInfo.isPreview，供 F4/F5 打 [试看] 标记使用；只增加字段，不改既有字段。",
+      "verify": "probe --step=auth → PGC-vip-ep826498 的 parse 结果 basicDownloadInfo.isPreview=true，free-ep826497=false"
+    }
+  ]
+}

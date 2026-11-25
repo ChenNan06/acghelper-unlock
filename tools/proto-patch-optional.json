@@ -1,0 +1,16 @@
+[
+ {
+  "file": "js/pages/background.js",
+  "offset": 9122,
+  "old": "s=await fetch(e,t).catch((e=>{throw e}))",
+  "new": "s=await fetch(e,Object.assign({credentials:\"include\"},t)).catch((e=>{throw e}))",
+  "effect": "B5（可选·条件触发）offscreen 的所有 api.bilibili.com 请求带上 Cookie：若 patch 后发现画质仍锁在 480P/720P，说明裸 fetch 没带 cookie，打这条"
+ },
+ {
+  "file": "js/pages/background.js",
+  "offset": 10771,
+  "old": "o=D(\"https://api.bilibili.com\"+a,{bvid:t,cid:i,qn:n,fnver:0,fnval:4048,fourk:1,tabId:this.tabId})",
+  "new": "o=D(\"https://api.bilibili.com\"+a,{bvid:t,cid:i,qn:n,fnver:0,fnval:4048,fourk:1,tabId:this.tabId,ep_id:this.epid})",
+  "effect": "B6（可选·条件触发）PGC playurl 显式带 ep_id：若 v2 接口只认 ep_id（返回 -404/空 video_info），打这条"
+ }
+]

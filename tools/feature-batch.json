@@ -1,0 +1,51 @@
+{
+  "name": "acgx-batch",
+  "version": "2.0.0",
+  "what": "ACGhelper 选集 / 多 P 批量下载：入口注入到插件自己的悬浮面板（#bilibiliHelper2ContentWrapper）内部 + offscreen 侧新增 acgxAutoDownload / acgxAbortAll 命令",
+  "base_tree": "batch 段是构建器最后一段，所以本规格的 old 锚点以「打 batch 之前那棵树」为基准 —— 即 output/ACGhelper-2.8.31.16-unlock 反向撤掉本规格 3 条补丁后的 build/pre-batch（两条树的往返差异 = 0，见 docs/batch-in-plugin-panel.md §补丁规格）",
+  "apply": "python tools/batch-prebatch-reverse.py --out build/pre-batch  →  python tools/apply-feature-batch.py --tree build/pre-batch --out build/batch-inpanel-test",
+  "notes": [
+    "additions[].copy：从 base_tree 之外的源码目录新增文件（不改动任何既有 .js/.html 的内容语义）",
+    "patches[]：字符串锚点补丁，old 必须在基准树上 count==1；锚点全部落在与下载/合并逻辑无关的位置",
+    "background.js 的分支只加在 St 命令分发链的末尾（fetchPlayInfoByQuality 之后、let Tt= 之前），且只转调 self.__acgxBatchAuto —— 不复制下载逻辑，避免与另一路对下载/合并代码的改动冲突",
+    "v2.0.0：acgx-batch.js 不再自建浮动按钮（旧右下角 FAB 已删除），改为向插件面板注入入口区块；样式在运行期从 div.button.primary 的 getComputedStyle 读出后写成 CSS 变量。3 条补丁的 old/new 与 v1.0.0 逐字节相同（它们只碰 manifest / background.html / background.js，与 acgx-batch.js 内容无关）",
+    "acgx-batch-offscreen.js（offscreen 执行端）与 v1.0.0 相同，下载/选流逻辑一行未改"
+  ],
+  "additions": [
+    {
+      "copy": {
+        "from": "src/addons/batch/js/pages/acgx-batch.js",
+        "to": "js/pages/acgx-batch.js"
+      }
+    },
+    {
+      "copy": {
+        "from": "src/addons/batch/js/pages/acgx-batch-offscreen.js",
+        "to": "js/pages/acgx-batch-offscreen.js"
+      }
+    }
+  ],
+  "patches": [
+    {
+      "id": "FB1",
+      "file": "manifest.json",
+      "why": "新增一条 content_scripts：番剧 play / 视频 / 合集列表页注入选集面板（run_at document_end，仅顶层 frame）",
+      "old": "                \"js/pages/contentFilterMain.js\"\n            ]\n        }\n    ],",
+      "new": "                \"js/pages/contentFilterMain.js\"\n            ]\n        },\n        {\n            \"run_at\": \"document_end\",\n            \"all_frames\": false,\n            \"matches\": [\n                \"*://*.bilibili.com/bangumi/play/*\",\n                \"*://*.bilibili.com/video/*\",\n                \"*://*.bilibili.com/list/*\",\n                \"*://*.bilibili.com/medialist/play/*\"\n            ],\n            \"js\": [\n                \"js/pages/acgx-batch.js\"\n            ]\n        }\n    ],"
+    },
+    {
+      "id": "FB2",
+      "file": "html/background.html",
+      "why": "offscreen 文档在 background.js 之前加载 batch 执行端（纯原生 JS，CSP script-src 'self' 允许）",
+      "old": "<script type=\"text/javascript\" src=\"../js/pages/background.js\"></script>",
+      "new": "<script type=\"text/javascript\" src=\"../js/pages/acgx-batch-offscreen.js\"></script>\n<script type=\"text/javascript\" src=\"../js/pages/background.js\"></script>"
+    },
+    {
+      "id": "FB3",
+      "file": "js/pages/background.js",
+      "why": "在 St 命令分发链末尾（fetchPlayInfoByQuality 之后、let Tt= 之前）加 acgxAutoDownload / acgxAbortAll 两个分支；只把 class bt 传给 self.__acgxBatchAuto，不复制下载逻辑",
+      "old": "_t(r,{command:\"setPlayurlInfoByQuality\",quality:n,playurlInfo:s})}};let Tt={",
+      "new": "_t(r,{command:\"setPlayurlInfoByQuality\",quality:n,playurlInfo:s})}else if(\"acgxAutoDownload\"===n){const A=self.__acgxBatchAuto;A?await A(e,t,i,bt):i&&i({ok:!1,error:\"ACGX_BATCH_HELPER_MISSING\"})}else if(\"acgxAbortAll\"===n){const B=self.__acgxBatchAbort;B&&B();i&&i({ok:!0})}};let Tt={"
+    }
+  ]
+}

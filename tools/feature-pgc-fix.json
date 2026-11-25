@@ -1,0 +1,55 @@
+{
+  "_meta": {
+    "name": "PGC 下载 0 字节修复（FLV/durl-MP4 形态）",
+    "generated_by": "protocol 角色复盘（真实 PGC 回包采样 + 成品树代码定位 + headless Chrome 运行期探针）",
+    "apply_base": "output/ACGhelper-2.8.31.16-unlock（static 10 + proto 23 + extra 5 = 38 条）",
+    "scope": "只动 js/pages/background.js 的 FLV(durl) 落盘分支与错误出口；DASH(UGC 4K/杜比) 分支一行不动",
+    "anchor_policy": "每条 old 在 38 条成品树上 count==1；不改 tools/proto-patch-spec.json / tools/extra-patch-spec.json / tools/static-patchspec.py",
+    "apply_order": "同文件内按偏移降序应用（F2 → F1 → F3 → F4），见 tools/apply-feature-pgc-fix.py",
+    "rootcause_doc": "docs/pgc-download-0byte-rootcause.md",
+    "verifier": "tools/verify-pgc-merge.mjs"
+  },
+
+  "patches": [
+    {
+      "id": "F1",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "class bt 之外的 FLV 缓存类 Be 的 writeFile（成品树 off≈50348）",
+      "old": "const t=await Me.mergeArrayBuffers(this.segmentBuffer);",
+      "new": "let t;try{t=await Me.mergeArrayBuffers(this.segmentBuffer)}catch(_e){const _s=this.segmentBuffer[0],_v=_s&&_s.subarray?_s.subarray(0,12):_s?new Uint8Array(_s,0,Math.min(12,_s.byteLength)):null;let _f=!1;if(_v)for(let _i=0;_i+4<=_v.length;_i++){if(_v[_i]===102&&_v[_i+1]===116&&_v[_i+2]===121&&_v[_i+3]===112){_f=!0;break}}if(!_f)throw _e;t=new Blob(this.segmentBuffer)};",
+      "why": "根因。PGC 的 durl 回包有两形态：真 FLV，以及「整段 MP4」（实测 preview=1、format=mp4、url 形如 ...-1-16.mp4）。L() 只按 `isFLV: durl&&!dash` 判形态，不看 format/字节，于是 MP4 形态也被送进 FLV 合并器 Ue：Ue 构造器先判 `indexOf('ftyp',0,5)`、再判 `indexOf('FLV',0,1)`，真 bilibili MP4 的 ftyp 在偏移 4（带 4 字节 box size），两个判据都不命中 → 抛 c.INVALID_FLV_HEADER（错误的FLV文件头）；若首段以裸 'ftyp' 开头则抛 c.FLV_IS_MP4。抛出后写入器一次都没 write → 产物 0 字节，而分段 fetch 进度已经 100%。此处 catch 只对「首段前 12 字节内出现 ftyp」的形态回退：把各分段 ArrayBuffer 原样拼成 Blob（MP4 的 durl 分段就是同一文件的字节区间，顺序拼接即为完整文件）。判定不通过时原异常照旧抛出，不掩盖 FLV 真错。",
+      "verify": "node tools/verify-pgc-merge.mjs → case durl-mp4-preview / durl-mp4-multiseg：修前抛 INVALID_FLV_HEADER 且写出 0 字节，修后写出 >0 字节且 ffprobe 读出 duration/streams；case durl-flv 仍走 FLV 合并（输出以 'FLV' 开头，ffprobe 可解析）"
+    },
+    {
+      "id": "F2",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "Be.writeFile 里的写入门表达式（成品树 off≈50348）",
+      "old": "(r&&\"locked\"in r&&!r.locked||r instanceof WritableStreamDefaultWriter&&!await r.closed)&&await r.write(t)",
+      "new": "(r&&\"locked\"in r&&!r.locked||r instanceof WritableStreamDefaultWriter)&&await r.write(t instanceof Blob&&r instanceof WritableStreamDefaultWriter?new Uint8Array(await t.arrayBuffer()):t)",
+      "why": "同一条链路上的两个独立缺陷。① 死锁：`WritableStreamDefaultWriter.closed` 在流关闭前一直 pending，`!await r.closed` 会把 writeFile 永久挂住 —— write 永远不发生、close 也就永远不发生；实测 headless Chrome 156 里同一表达式 race 800ms 结果为 HANG，而 DASH 用的门（`a instanceof WritableStreamDefaultWriter`，无 !await closed）结果为 WROTE。② 类型：mergeArrayBuffers 返回 Blob，而 streamsaver 落盘 sink 的 write()/transform() 只收 Uint8Array（源码内联 'Can only write Uint8Arrays'，实测真浏览器抛 TypeError）。所以 writer 通道必须先转 Uint8Array；FSA(FileSystemWritableFileStream) 通道保持 Blob，零拷贝不变。",
+      "verify": "node tools/verify-pgc-merge.mjs → case writer-streamsaver：修前 800ms 超时判 HANG，修后写出 Uint8Array 且字节数>0；case writer-fsa 两种树都应写出字节"
+    },
+    {
+      "id": "F3",
+      "priority": "P1",
+      "file": "js/pages/background.js",
+      "anchor_hint": "class bt.runWriteFile（成品树 off≈61632）",
+      "old": "runWriteFile(e,t=l.video){const i=e.writeFile(t);i.catch((e=>this.emit(\"error\",e)))}",
+      "new": "runWriteFile(e,t=l.video){const i=e.writeFile(t);i.catch((e=>this.emit(\"error\",e instanceof h?e:new h(r.ERROR_REQUEST_DATA,\"落盘失败: \"+((e&&e.message)||String(e))))))}",
+      "why": "FLV 合并器里有多处 `throw \"...\"`（字符串，不是 Error）：'FLV unexpected end of file'、'timestamp < 0'、'Usage: FLV.mergeBlobs([blobs])'。字符串一路走到 offscreen 的错误出口 `new h(e?.code||-1,e.message)` 后 message 变 undefined，UI 只弹一个没有内容的 toast（用户侧读作「打包/处理失败」这类无信息文案），真实原因全丢。这里在 bt 侧统一归一化：已是 DownloaderError 的原样透传（保留 code+文案），其它一律包成 code=ERROR_REQUEST_DATA 且把 message/String(e) 带出去。",
+      "verify": "node tools/verify-pgc-merge.mjs → case err-normalize：喂一个 throw 字符串的 merge 失败，断言 emit 出来的错误 instanceof DownloaderError 且 message 含原始字符串"
+    },
+    {
+      "id": "F4",
+      "priority": "P1",
+      "file": "js/pages/background.js",
+      "anchor_hint": "downloadFLV 的 showSaveFilePicker 分支（成品树 off≈62816）",
+      "old": "await window.showSaveFilePicker({suggestedName:this.filename||\"output\",types:[{accept:{[\"video/x-flv\"]:[\".flv\"]}}]}).catch((e=>{}))",
+      "new": "await window.showSaveFilePicker({suggestedName:this.filename||\"output\",types:[{accept:{[\"video/x-flv\"]:[\".flv\"]}}]}).catch((e=>{if(\"AbortError\"!==e.name)throw e}))",
+      "why": "DASH 分支的 picker catch 会区分 AbortError / NotAllowedError(已打开) / 其它并 rethrow，而 FLV 分支写成 `.catch((e=>{}))`：任何真实异常（实测 offscreen 文档里 showSaveFilePicker 抛 SecurityError: Must be handling a user gesture）都被吞掉，随后 `if(!u)throw c.CANCEL` 把它变成「下载已取消」——最能定位问题的一条线索被改写成用户主动取消。此条让 FLV 分支与 DASH 分支口径一致。",
+      "verify": "node tools/verify-pgc-merge.mjs → case picker-error：模拟抛 SecurityError，修前得到 CANCEL，修后得到 Error('Must be handling a user gesture…')"
+    }
+  ]
+}

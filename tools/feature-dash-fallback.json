@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "name": "空视频段自动回退最优视频轨（用户主诉根治：4K 视频下成纯 aac）",
+    "generated_by": "unpack 角色 r3 发布轮（headless Chrome 实测 + 成品树字符串定位）",
+    "apply_base": "output/ACGhelper-2.8.31.16-unlock（r2 = 53 条成品树；本规格在其上 count==1）",
+    "scope": "js/pages/video.js（两处 startDownload 出站消息补 audioOnly 意图 + downloadNotice 展示分支） 与 js/pages/background.js（offscreen 分发器记录意图 + downloadDash 回退核心）。不触碰 VIP/授权层、不改 pgc-fix / dash-auth-fix / webdav / batch 的规格与应用器",
+    "anchor_policy": "每条 old 在 r2 成品树的目标文件内 count==1；tools/apply-feature-dash-fallback.py 强制校验；构建器在「pgc-fix → dash-auth-fix → dash-fallback」顺序下再次 assert",
+    "apply_order": "同文件按偏移降序（background.js: DF4@71338 → DF5@64148；video.js: DF2@73326 → DF1@57575 → DF3@42534）",
+    "why_doc": "docs/r3-video-track-fallback.md",
+    "verifier": "tools/verify-independent-61.py（逐字节重放）+ build/dash-auth-test/probe-r3.mjs（真下载 ffprobe）",
+    "trigger_rule": "仅当 [s.video 为空] 且 [s.audio 非空] 且 [optionIndex 视频段为空串] 且 [downloadOptionData.video 存在可用轨] 且 [页面未显式声明 audioOnly:true] 时触发；显式仅音频路径（audioOnly:true）行为不变"
+  },
+  "patches": [
+    {
+      "id": "DF1",
+      "priority": "P0",
+      "file": "js/pages/video.js",
+      "anchor_hint": "组件 ke 的 K() 出站消息（startDownload，optionDataVersion:L.current）—— r2 树 off=57575",
+      "old": "optionDataVersion:L.current,segments:null})",
+      "new": "optionDataVersion:L.current,segments:null,audioOnly:!!(Q||a&&!1===a.video)})",
+      "why": "把页面的「显式仅音频」意图随 startDownload 一起传到 offscreen。判据来源：组件 ke 里 optionState 的 audioOnly 是 Q（`{videoOnly:$,audioOnly:Q,empty:X}=T`），另外 K(cid,选择,{video,audio}) 这个自动/批量入口用第三参 a.video===false 表达同一意图（`N||(c||(l=[]),d||(s=[]))` 会把视频选项清空）。不传这个字段，offscreen 无法区分「用户选了仅音频」与「面板选项没建好导致视频段为空」——两者序列化出来都是 ',a-b-c'。",
+      "verify": "probe-r3 --step=download --index=\",0-0-0\" --audioOnly=1 → 不出现 downloadNotice、产物仍为纯音频；--audioOnly=0 → 出现 downloadNotice 且产物双流"
+    },
+    {
+      "id": "DF2",
+      "priority": "P0",
+      "file": "js/pages/video.js",
+      "anchor_hint": "画面选项面板组件 Q() 的出站消息（optionDataVersion:O.current）—— r2 树 off=73326",
+      "old": "optionDataVersion:O.current,segments:r})",
+      "new": "optionDataVersion:O.current,segments:r,audioOnly:!!Y})",
+      "why": "同上，但这是 `画面选项` 面板的主下载按钮（`{videoOptionsError:W,audioOptionsError:U,videoOnly:V,audioOnly:Y,empty:$}=C`）。用户主诉正是这条路径：选了 4K 画面却序列化出 `,0-0-0`（`[T,R].filter(Boolean)` 对空数组仍 truthy → `[].join('-')===''`），offscreen 拿到空视频段后静默出纯音轨。",
+      "verify": "node --check js/pages/video.js；probe-r3 两组 index 各跑一次"
+    },
+    {
+      "id": "DF3",
+      "priority": "P1",
+      "file": "js/pages/video.js",
+      "anchor_hint": "组件 W 的 onMessage 命令链（downloadStopped 之后、setPlayurlInfoByQuality 之前）—— r2 树 off=42534",
+      "old": "else if(\"downloadStopped\"===e?.command)k(!1),te(!1),oe(!0),he(null),a();else if(\"setPlayurlInfoByQuality\"===",
+      "new": "else if(\"downloadStopped\"===e?.command)k(!1),te(!1),oe(!0),he(null),a();else if(\"downloadNotice\"===e?.command)de(String(e?.message||\"\")),a();else if(\"setPlayurlInfoByQuality\"===",
+      "why": "让 downloadNotice 这个回执在面板里真的可见：复用既有提示行 setter de()（同一条链上 downloadProgress 用它显示「如果下载进度卡住…」）。注：de 的文本会在下一条 progress 事件进来时被清空（产品原逻辑），所以持久证据由 offscreen 的 console.warn 与 downloadNotice 消息本身承担。",
+      "verify": "probe-r3 断言 offscreen 出站消息里出现 {command:'downloadNotice',code:'VIDEO_TRACK_FALLBACK'}，且 offscreen 控制台出现 [acgx][dash-fallback] 警告"
+    },
+    {
+      "id": "DF4",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "St() 分发器 startDownload 分支调用 a.download 之前 —— r2 树 off=71338",
+      "old": ",a.download(n,r,void 0,s).then(",
+      "new": ",a.audioOnlyIntent=!!e?.audioOnly,a.download(n,r,void 0,s).then(",
+      "why": "把页面带来的 audioOnly 意图挂到下载器实例上（每次 startDownload 都显式覆盖，缺字段即 false，不会残留上一次的意图）。downloadDash 的签名 (optionIndex,segments,useStreamSaver,optionDataVersion) 不变，避免动 bt.download 的调用契约。",
+      "verify": "probe-r3 三组用例的触发/不触发差异即该字段生效的直接证据"
+    },
+    {
+      "id": "DF5",
+      "priority": "P0",
+      "file": "js/pages/background.js",
+      "anchor_hint": "downloadDash 里 o.track 构造与 useStreamSaver 兜底之间 —— r2 树 off=64148",
+      "old": "const o={track:{video:Boolean(s.video),audio:Boolean(s.audio)},segments:t,useStreamSaver:i};!ut&&window?.showSaveFilePicker||(o.useStreamSaver=!0);",
+      "new": "const o={track:{video:Boolean(s.video),audio:Boolean(s.audio)},segments:t,useStreamSaver:i};const _vf=this.downloadOptionData,_vseg=String(e??\"\").split(\",\")[0].trim();if(!s.video&&s.audio&&\"\"===_vseg&&this.audioOnlyIntent!==!0){const _av=Array.isArray(_vf&&_vf.video)?_vf.video:[],_ai=Array.isArray(_vf&&_vf.audio)?_vf.audio:[];const _bv=(()=>{for(const _g of _av){if(!_g||!Array.isArray(_g.children))continue;for(let _i=0;_i<_g.children.length;_i++){const _c=_g.children[_i];if(_c&&Array.isArray(_c.children)&&_c.children.length>0&&_c.children[0]&&_c.children[0].value)return Y(_g,_c,0)}}return null})();if(_bv){s.video=_bv,o.track.video=!0;const _m=\"\\u672a\\u9009\\u62e9\\u89c6\\u9891\\u8f68\\uff0c\\u5df2\\u81ea\\u52a8\\u4f7f\\u7528\\u6700\\u4f18\\u89c6\\u9891\\u8f68 \"+_bv.quality+\"/\"+(_bv.codec||\"?\");try{console.warn(\"[acgx][dash-fallback] \"+_m+\" (downloadOptionIndex=\"+String(e??\"\")+\", videoTracks=\"+_av.length+\")\")}catch(_w0){}try{this.sendMessage({command:\"downloadNotice\",level:\"warn\",code:\"VIDEO_TRACK_FALLBACK\",message:_m,downloadOptionIndex:String(e??\"\"),quality:_bv.quality,codec:_bv.codec,videoTrackCount:_av.length,audioTrackCount:_ai.length})}catch(_w1){}}}!ut&&window?.showSaveFilePicker||(o.useStreamSaver=!0);",
+      "why": "用户主诉的根治点。X() 把空视频段解析成 video:null 后，原代码一路 `0!==g.segmentInfo.video.length` 的初始化、`o.track.video=false` 的尺寸估算、单轨 initHeadData，最终写出只有一条 aac 的 mp4 且照常 downloadCompleted。此处按 downloadOptionData.video 的既有顺序（qn 顺序 = acceptQuality 顺序，高→低；codec 顺序 = 站方 dash.video 原始顺序）取第一个「有 codec 且有线路」的轨，用同一支 Y() 造出与 UI 选择完全同构的轨道对象，写回 s.video 并抬起 o.track.video，随后 F1/F2（dash-auth-fix）看到的 s.video 已非空 → 文件名仍 .mp4、picker 仍 video/mp4，产物是真正的双流。同时 console.warn + this.sendMessage（既有 {to:'targetTab'} 回执通道）发一条 downloadNotice。",
+      "verify": "probe-r3 --index=\",0-0-0\" → 修前 ffprobe streams=[audio:aac]、5.3MB 级纯音频；修后 streams=[video:*, audio:aac] 且 notice 出现"
+    }
+  ]
+}

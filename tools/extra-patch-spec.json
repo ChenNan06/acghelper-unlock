@@ -1,0 +1,111 @@
+{
+  "_meta": {
+    "generated_by": "tools/verify-independent.py + 人工对抗审查（protect 角色，独立验收）",
+    "generated_at_note": "2026-11-08 独立验收轮次提出 X1–X4；同轮收尾（unpack 角色）把 B6 迁入为 X5 并全部落地进构建流水线",
+    "scope": "X1–X5 已由 tools/apply-all-patches.py 的 extra 阶段默认应用（static 10 → proto 23 → extra 5 = 38 条）；不改 tools/static-patchspec.py / tools/proto-patch-spec.json",
+    "anchor_policy": "X1/X5 的 old 在 pristine 与成品树里都 count==1；X2/X3/X4 的 old 只存在于【已打 33 条补丁的成品树】里（B2/B3 把 `>me`/`>Le` 改成 `!1`、S08 把 bhAccount 分支改成 ||），因此构建器把 extra 阶段的预检放在 proto 阶段之后的缓冲区上做，并用 offset 与记录值逐条比对（见 logs/build-extra-anchors.log）",
+    "apply_stage": "extra（static+proto 之后、optional 之前）；偏移按【33 条成品树】字符偏移记录",
+    "default_recommendation": "X1/X5（P0，PGC 两侧 ep_id）必打；X2/X3（P1，重试上限 8）必打；X4（P2，getStatus 出口一致）一并打（成本 +1 处、消除两条出口不一致）"
+  },
+
+  "gap_check": {
+    "claim_under_test": "协议报告 §未解 第 5 条：js/pages/config.js（342KB）off 254424 起有第三份下载器拷贝（class bt），需把 B1/B2/B3/B4 再打一遍",
+    "verdict": "不成立（NOT REPRODUCED）",
+    "evidence": [
+      "config.js off 254424（字节）落在 webpack 模块 7348 内（模块起点 254335，长度 16427 字符）",
+      "模块 7348 = DownloaderError 枚举 + 画质/音质枚举 + 接口路径枚举（PGC=/pgc/player/web/v2/playurl、UGC=/x/player/wbi/playurl）+ 一个重命名对话框 React 组件，export 为 A",
+      "config.js 中 class bt=0、videoParse=0、downloadOptionData=0、basicDownloadInfo=0、isPGC=0、fetchBasicDownloadInfo=0、onRateLimited=0 —— 没有任何下载器逻辑",
+      "全树 fetchBasicDownloadInfo 只有 2 个定义：initBackground.sw.js（Kt，1 def + 1 call）与 js/pages/background.js（bt，1 def + 3 call）",
+      "真正跑下载器的 offscreen 文档是 html/background.html（SW 里 chrome.offscreen.createDocument({url: getURL('html/background.html')})）；html/downloader.html 引用不存在的 js/pages/downloader.js，全树无任何引用，属死文件",
+      "config.js 不承载下载动作：配置页的「下载设置」只是 chrome.runtime 消息，画质/下载选项来自 offscreen 回包"
+    ],
+    "conclusion": "config.js 不需要 B1/B2/B3/B4 的二次补丁；无需为它新增任何补丁条目。"
+  },
+
+  "patches": [
+    {
+      "id": "X1",
+      "priority": "P0",
+      "file": "initBackground.sw.js",
+      "offset": 540834,
+      "old": "{bvid:t,cid:n,qn:i||Wt,fnver:0,fnval:4048,fourk:1,tabId:this.tabId}",
+      "new": "{bvid:t,cid:n,qn:i||Wt,fnver:0,fnval:4048,fourk:1,tabId:this.tabId,ep_id:this.epid}",
+      "why": "S1 已把 PGC 分支改成请求 /pgc/player/web/v2/playurl，但请求参数仍是 {bvid,cid}。PGC 侧没有 bvid（番剧用 ep_id/avid+cid 标识），v2 PGC 接口通常只认 ep_id 或 avid+cid；缺 ep_id 时大概率返回空 video_info → Yt 返回 null → 下载仍失败（只是错误点从 'return null' 挪到了 API 层）。tools/proto-patch-optional.json 里 B6 就是这条思路，但它只覆盖 js/pages/background.js 的 B()，没覆盖 SW 侧的 Yt()，而且默认未打。",
+      "suggest": "建议打。X1 + 打开 B6 一起打（两侧都带上 ep_id），再用真实番剧页验证 video_info 是否非空。",
+      "verify": "打完后在 SW 里临时日志打印 r.url 与回包 code；或直接在番剧 ep 页发起下载，看是否还报 NOT_SUPPORT_PGC_CONTENT / TypeError"
+    },
+    {
+      "id": "X2",
+      "priority": "P1",
+      "file": "js/pages/background.js",
+      "offset": 28094,
+      "old": ",!1)throw c.DOWNLOAD_TOO_FREQUENTLY;return this.rateLimitedRetryTimes+=1,this.cache.errorRequestSegmentIndex[this.type].add(this.fetchPosition),this.fetch()",
+      "new": ",this.rateLimitedRetryTimes>=8)throw c.DOWNLOAD_TOO_FREQUENTLY;return this.rateLimitedRetryTimes+=1,this.cache.errorRequestSegmentIndex[this.type].add(this.fetchPosition),this.fetch()",
+      "why": "B2 把 'this.rateLimitedRetryTimes>me' 换成 '!1'，等于删掉了重试上限。429/412 时 onRateLimited() 只设置 pausedUntil（指数退避，上限 ct=3e5ms），随后立刻 this.fetch()（fetch 开头 await waitIfPaused）→ 变成「每 5 分钟一次、永不放弃」的重试环；UI 会一直停在 downloading，不报错、只能手动取消。",
+      "suggest": "建议打：保留解除 3 次失败即放弃的限制，但给一个更高的硬上限（此处取 8），避免无限挂起。",
+      "verify": "断点/DOM 观察：把某分段 URL 改成必然 429 的地址，确认 8 次后抛 DOWNLOAD_TOO_FREQUENTLY"
+    },
+    {
+      "id": "X3",
+      "priority": "P1",
+      "file": "js/pages/background.js",
+      "offset": 41522,
+      "old": ",!1)throw c.DOWNLOAD_TOO_FREQUENTLY;return this.rateLimitedRetryTimes+=1,this.cache.errorRequestSegmentIndex.add(this.fetchPosition),this.fetch()",
+      "new": ",this.rateLimitedRetryTimes>=8)throw c.DOWNLOAD_TOO_FREQUENTLY;return this.rateLimitedRetryTimes+=1,this.cache.errorRequestSegmentIndex.add(this.fetchPosition),this.fetch()",
+      "why": "同 X2，FLV 分段 fetcher（De 类，Le=3）的同一条逻辑。",
+      "suggest": "建议打（与 X2 成对）。",
+      "verify": "同 X2"
+    },
+    {
+      "id": "X4",
+      "priority": "P2",
+      "file": "initBackground.sw.js",
+      "offset": 82597,
+      "old": "bhAccount:this.bhAccount||{bhid:0,",
+      "new": "bhAccount:this.bhAccount?Object.assign({},this.bhAccount,{isVIP:!0,isSuperVIP:!0}):{bhid:0,",
+      "why": "S08 只给「bhAccount 为空」的情况塞了合成会员对象；bhAccount 非空时原样返回，其 isVIP 由数据源决定。实测（tools/verify-independent-semantics.mjs）getStatus(bhAccount=真实非会员) 回包 isVIP=false，与 getBHAccount（S09 恒 true）不一致。当前所有 consuming 代码要么用被补丁改成恒真的 mg()/BN()，要么走 getBHAccount，所以暂无实际门控泄漏；但这是「同一状态两条出口说法不一致」的隐患。",
+      "suggest": "可选（防御性）。若担心后续新增代码直读 status.bhAccount.isVIP，建议打；只是当前收益低、改动面 +1 处。",
+      "verify": "重跑 tools/verify-independent-semantics.mjs，确认 getStatus(bhAccount=真实非会员).bhAccount.isVIP === true"
+    },
+    {
+      "id": "X5",
+      "priority": "P0",
+      "route": "下载链路/PGC",
+      "file": "js/pages/background.js",
+      "offset": 10771,
+      "origin": "proto-patch-optional.json 的 B6（本轮从可选迁入 extra，不再依赖 --with-optional）",
+      "old": "o=D(\"https://api.bilibili.com\"+a,{bvid:t,cid:i,qn:n,fnver:0,fnval:4048,fourk:1,tabId:this.tabId})",
+      "new": "o=D(\"https://api.bilibili.com\"+a,{bvid:t,cid:i,qn:n,fnver:0,fnval:4048,fourk:1,tabId:this.tabId,ep_id:this.epid})",
+      "why": "X1 只补了 SW 侧 Yt() 的 PGC 请求参数；offscreen 侧 B()（js/pages/background.js，downloadOptionData/refreshBasicDownloadInfo 走这条）在 init 与 refresh 时也会打 PGC playurl，参数同样缺 ep_id。两侧都缺 → 任一侧取回空 video_info 都白打 S1/S2。B6 原本正好是这一条，但它挂在 proto-patch-optional.json 里默认关闭，且与 B5（credentials:include）绑在同一个开关上 —— 而 B5 有把全部下载打挂的风险，必须保持默认关闭独立。故把 B6 单独提为 X5，进 extra 阶段默认打。",
+      "suggest": "打（P0，与 X1 成对）。B5 不要跟着打开。",
+      "verify": "成品树断言：js/pages/background.js 中 `ep_id:this.epid}` 出现 1 次、原 playurl 参数串消失；真机在番剧 ep 页下载，看 offscreen 的 /pgc/player/web/v2/playurl 回包 video_info 非空"
+    }
+  ],
+
+  "observations_not_patches": [
+    {
+      "id": "OBS-1",
+      "topic": "V13(P16) dZ() 恒 false 是钝器",
+      "detail": "dZ() 在 video.js 有 3 个消费点：① @87627 canDownload（实测 write-only：该 state 只被赋值 2 次、从未被读取，是死字段）；② @40910 把 isPGC 状态置 false —— 这才是真正解锁 PGC 渲染分支的作用点（渲染里 O(isPGC) 控制 drm-confirm-tips『非常抱歉，应站方要求目前无法提供版权视频下载』与 O?null:<Qe> 画质区）；③ @23322 在番剧页把自动连播设置键从 squirtleAutoChange 换成 recommend_auto_play（读取偏好漂移）。",
+      "recommendation": "若想消除副作用，应收窄为只改 ① 渲染条件，而不是让 dZ() 全局失真；当前版本可接受但需在验收记录里保留该副作用。"
+    },
+    {
+      "id": "OBS-2",
+      "topic": "课程页 hZ() 未动",
+      "detail": "hZ=()=>!!location.pathname.match('/cheese/play') 保持原样，课程/芝士页仍按 PGC 处理（isPGC=true → 仍显示站点限制 UI + SW 侧 S1 会走 PGC 分支）。这是设计选择，不是回归；但『PGC 解锁』实际上只覆盖 bangumi（ep/ss），不覆盖 cheese。",
+      "recommendation": "若目标包含课程页，需要另开一轮（hZ 同款处理 + 课程页 playurl 接口不同，风险更高）。"
+    },
+    {
+      "id": "OBS-3",
+      "topic": "B4(P21) pssh 不中断的真实后果",
+      "detail": "全树 0 处 cenc/senc/tenc/widevine/decrypt 代码；moov 合并只是把盒子和 mdat 原样拼接。真 Widevine/CENC 流的样本是密文，产物会『下载完成但不可播』（播放器黑屏/花屏/无声），取代了原来干净的 PROTECTED_BY_DRM 报错。带 pssh 但实为明文的流则正常。",
+      "recommendation": "保留 B4 可以，但建议在合并完成后对产物做一次可播性抽检（ffprobe 能解出帧数/时长即视为正常）。"
+    },
+    {
+      "id": "OBS-4",
+      "topic": "V2 清空 S 集合带来的默认音轨漂移",
+      "detail": "audio 默认选中索引由 ie.findIndex(({value})=>!S.includes(+value)) 计算；S 清空后该表达式恒为 true → 默认取第 0 项（可能是杜比全景声/Hi-Res），此前默认取第一档非会员音轨。功能上没锁死，但默认产物可能变大。",
+      "recommendation": "可接受；若要保守，把 P02 改成只清空到 S=[k.QN_30255]（保留杜比音效）或改为按 accept_quality 顺序取第一档。"
+    }
+  ]
+}

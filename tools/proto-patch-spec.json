@@ -1,0 +1,163 @@
+[
+ {
+  "file": "js/pages/video.js",
+  "offset": 35360,
+  "old": "_=[y.QN_127,y.QN_126,y.QN_125,y.QN_120,y.QN_116,y.QN_112]",
+  "new": "_=[]",
+  "effect": "V1 视频 VIP 画质集合清空：127/126/125/120/116/112 不再 need-blvip/need-bhvip，不再被禁用、点击不再跳付费"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 35418,
+  "old": "S=[k.QN_30250,k.QN_30251,k.QN_30255]",
+  "new": "S=[]",
+  "effect": "V2 音频 VIP 集合清空：杜比全景声/Hi-Res/杜比音效不再需要会员"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 36798,
+  "old": "children:p.audio?G([p.audio]):[],className:\"need-blvip need-bhvip\",disabled:!t,",
+  "new": "children:p.audio?G([p.audio]):[],className:\"\",disabled:!1,",
+  "effect": "V3 flac(30251 Hi-Res) 条目解锁：disabled:!t → disabled:!1（t=isBLVIP）"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 36897,
+  "old": "onClick:({isBLVIP:e,isBHVIP:t})=>(e&&!t&&B(),t)}),!l&&d?.type",
+  "new": "onClick:()=>!0}),!l&&d?.type",
+  "effect": "V3b flac(Hi-Res) 条目点击闭包去掉(!isBHVIP→跳付费)判定，恒允许选中"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 37116,
+  "old": "children:d.audio?G(d.audio):[],className:\"need-blvip need-bhvip\",disabled:!t,",
+  "new": "children:d.audio?G(d.audio):[],className:\"\",disabled:!1,",
+  "effect": "V4 dolby(30250 杜比全景声) 条目解锁"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 37213,
+  "old": "onClick:({isBLVIP:e,isBHVIP:t})=>(e&&!t&&B(),t)}),(c||l)&&m.push",
+  "new": "onClick:()=>!0}),(c||l)&&m.push",
+  "effect": "V4b dolby 条目点击闭包去掉(!isBHVIP→跳付费)判定"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 37707,
+  "old": "disabled:p||!t&&d,needBLVIP:d,",
+  "new": "disabled:p,needBLVIP:d,",
+  "effect": "V5 视频画质条目禁用条件去掉 !isBLVIP&&needVIP 项（与 V1 双保险）"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 37757,
+  "old": "onClick:d?({isBLVIP:e,isBHVIP:t})=>(e&&!t&&B(),t):()=>!0",
+  "new": "onClick:()=>!0",
+  "effect": "V5b 视频画质条目点击恒允许（V1 已让 d 恒 false，此条双保险）"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 38040,
+  "old": "className:A()({\"need-blvip\":i,\"need-bhvip\":i}),disabled:!t&&i,",
+  "new": "className:A()({}),disabled:!1,",
+  "effect": "V6 音轨条目禁用条件去掉 !isBLVIP&&needVIP 项"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 73356,
+  "old": "if(!M&&(V||Y&&G.length>0)||t&&!M&&e.length>0)return j();",
+  "new": "if(!1)return j();",
+  "effect": "V7 高级模式下载主按钮起跑门（M=isBHVIP）：不再跳 handleOnClickGotoPayment"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 75485,
+  "old": "disabled:W||U||!M&&!L&&(V||Y)||$||p||Boolean(y),onClick:Q",
+  "new": "disabled:W||U||$||p||Boolean(y),onClick:Q",
+  "effect": "V8 高级模式下载按钮 disabled 去掉 !isBHVIP&&!isFLV&&(videoOnly||audioOnly)"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 75188,
+  "old": "disabled:p||_||!M,status:U?\"warning\":\"\"",
+  "new": "disabled:p||_,status:U?\"warning\":\"\"",
+  "effect": "V9 高级模式音频级联框：非 isBHVIP 不再整体禁用（原 disabled 含 !M）"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 57574,
+  "old": "if(V||Y||!z&&!N&&($||Q&&j.length>0)||t&&!z&&e.length>0||X&&!N||p)return!1;",
+  "new": "if(V||Y||X&&!N||p)return!1;",
+  "effect": "V10 简单模式画质按钮点击门（z=isBHVIP）：去掉仅画面/仅音频/切片下载的会员限制"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 57363,
+  "old": "if(!z&&_.includes(n))return W()",
+  "new": "if(!1)return W()",
+  "effect": "V11 简单模式点 VIP 画质不再跳付费（z=isBHVIP）"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 57395,
+  "old": "else if(_.includes(n))return o.QB.info(",
+  "new": "else if(!1)return o.QB.info(",
+  "effect": "V12 非 b 站大会员不再被『请先开通b站大会员』拦（与 V1 双保险）"
+ },
+ {
+  "file": "js/pages/video.js",
+  "offset": 335546,
+  "old": "i=()=>!!location.pathname.match(\"/bangumi/play\")",
+  "new": "i=()=>!1",
+  "effect": "V13 PGC 判定器 dZ() 恒 false：番剧页不再进『根据站方要求无法继续提供PGC内容下载』渲染分支"
+ },
+ {
+  "file": "js/pages/background.js",
+  "offset": 59365,
+  "old": "return Object.assign(this,e),this.downloadOptionData=H(this.basicDownloadInfo),this.recordSourceVersion()",
+  "new": "return Object.assign(this,e),this.basicDownloadInfo||(this.basicDownloadInfo=await this.fetchBasicDownloadInfo(this.isPGC,this.bvid,this.cid)),this.downloadOptionData=H(this.basicDownloadInfo),this.recordSourceVersion()",
+  "effect": "B1 offscreen 下载器 init：SW 对 PGC 返回 null 时用本文件 PGC-aware 的 fetchBasicDownloadInfo 自取 playurl"
+ },
+ {
+  "file": "js/pages/background.js",
+  "offset": 67370,
+  "old": "});Object.assign(this,e),this.downloadOptionData=H(this.basicDownloadInfo)}async doRefreshDownloadOption(e)",
+  "new": "});Object.assign(this,e),this.basicDownloadInfo||(this.basicDownloadInfo=await this.fetchBasicDownloadInfo(this.isPGC,this.bvid,this.cid)),this.downloadOptionData=H(this.basicDownloadInfo)}async doRefreshDownloadOption(e)",
+  "effect": "B1b 同一问题的刷新路径（refreshBasicDownloadInfo）"
+ },
+ {
+  "file": "js/pages/background.js",
+  "offset": 28022,
+  "old": "if(this.cache.downloader.onRateLimited(e.status,e.retryAfterSeconds),this.rateLimitedRetryTimes>me)throw c.DOWNLOAD_TOO_FREQUENTLY;",
+  "new": "if(this.cache.downloader.onRateLimited(e.status,e.retryAfterSeconds),!1)throw c.DOWNLOAD_TOO_FREQUENTLY;",
+  "effect": "B2 DASH 分段 fetcher(pe)：429/412 不再抛 DOWNLOAD_TOO_FREQUENTLY（退避仍生效，me=3）"
+ },
+ {
+  "file": "js/pages/background.js",
+  "offset": 41477,
+  "old": "if(this.cache.downloader.onRateLimited(e.status,e.retryAfterSeconds),this.rateLimitedRetryTimes>Le)throw c.DOWNLOAD_TOO_FREQUENTLY;",
+  "new": "if(this.cache.downloader.onRateLimited(e.status,e.retryAfterSeconds),!1)throw c.DOWNLOAD_TOO_FREQUENTLY;",
+  "effect": "B3 FLV 分段 fetcher(De)：同上（Le=3）"
+ },
+ {
+  "file": "js/pages/background.js",
+  "offset": 18584,
+  "old": "if(r?.boxs.find((e=>\"pssh\"===e.type)))throw c.PROTECTED_BY_DRM;",
+  "new": "if(!1&&r?.boxs.find((e=>\"pssh\"===e.type)))throw c.PROTECTED_BY_DRM;",
+  "effect": "B4 可选：pssh 检测不再中断（对带 pssh 但实为明文的流有效；真 Widevine 内容是密文，需 CDM 密钥）"
+ },
+ {
+  "file": "initBackground.sw.js",
+  "offset": 540438,
+  "old": "if(e)return null;{const e=yt.UGC;",
+  "new": "{const e=yt[this.isPGC?\"PGC\":\"UGC\"];",
+  "effect": "S1 SW videoParse：PGC 不再直接 return null，改请求 /pgc/player/web/v2/playurl"
+ },
+ {
+  "file": "initBackground.sw.js",
+  "offset": 540621,
+  "old": ".then((t=>e?t?.data?.video_info:t?.data))",
+  "new": ".then((t=>e?(t?.result||t?.data)?.video_info:t?.data))",
+  "effect": "S2 SW videoParse：PGC 回包结构取 result.video_info（v2 API）"
+ }
+]

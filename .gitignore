@@ -1,0 +1,15 @@
+# 原始扩展与构建产物不入库
+acg-helper-*.zip
+src/extracted/
+output/
+build/
+logs/
+
+# 凭据
+*.local.json
+user-config*.json
+
+# Python / Node
+__pycache__/
+*.pyc
+node_modules/

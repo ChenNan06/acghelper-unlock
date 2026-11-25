@@ -1,0 +1,97 @@
+{
+  "name": "feature-webdav",
+  "version": 2,
+  "description": "给 ACGhelper 解锁版新增「WebDAV 云同步」：把官方会员服务器的设置云同步换成用户自己的 WebDAV。v2 起同步设置不再有独立入口与浮动按钮，而是长在官方设置页里作为左侧导航的一栏「同步」（导航项 + 内容区全部 DOM 注入，不动 React bundle）：栏内可改服务器（地址/账号/密码/远端目录）、按分组勾选同步内容、开关定时同步（间隔/方向）、看状态与历史快照。新增文件全部落在 src/addons/webdav/ 下；仅修改 html/config.html（注入核心库 + 设置栏脚本）、manifest.json（新增 WebDAV 域名的 host 权限 + optional_host_permissions）、initBackground.sw.js（尾部 importScripts 引导 SW 侧 alarm 监听）。",
+  "appliesTo": [
+    "output/ACGhelper-2.8.31.16-unlock",
+    "output/ACGhelper-2.8.31.16-unlock-sameId"
+  ],
+  "basePatchCount": 38,
+  "verifiedOn": "output/ACGhelper-2.8.31.16-unlock",
+  "applyOrder": "在 apply-all-patches.py 产出 38 条成品树之后应用；v2 的 W1 锚点是「v1 注入的 inject.js 那三行 + </body>」，因此本 spec 的基准树是已含 v1 WebDAV 功能的 r3 成品树（同样 count==1 实测）。",
+  "checkCommand": "python tools/feature-webdav-apply.py --check --tree output/ACGhelper-2.8.31.16-unlock",
+  "patches": [
+    {
+      "id": "W0-html",
+      "kind": "copy",
+      "from": "src/addons/webdav/html/webdav.html",
+      "to": "html/webdav.html",
+      "why": "WebDAV 独立页（保留为高级入口：逐条差异比对/原始日志/手工恢复）。设置页「同步」栏里有一行「在独立页面打开（高级）」链到它。",
+      "count": 1
+    },
+    {
+      "id": "W0-core",
+      "kind": "copy",
+      "from": "src/addons/webdav/js/webdav-core.js",
+      "to": "src/addons/webdav/js/webdav-core.js",
+      "why": "共享核心库：官方云同步协议复用（getSettingsForUpload / setSettingsFromCloud）、原始 storage 快照降级、WebDAV 客户端（逐级 MKCOL + GET 回读 sha256）、历史快照与冲突判定，以及 v2 新增的同步范围分组（SCOPE_KEY / GROUPS / currentAllow，采集时按白名单过滤）。设置栏、独立页、SW 三处共用同一份。",
+      "count": 1
+    },
+    {
+      "id": "W0-panel",
+      "kind": "copy",
+      "from": "src/addons/webdav/js/webdav-settings-panel.js",
+      "to": "src/addons/webdav/js/webdav-settings-panel.js",
+      "why": "【v2 新增】设置页内嵌「同步」栏：深克隆原生 .aside-item 生成导航项（字号/颜色/圆角/选中态与相邻项逐像素一致），在 main 里注入内容区（服务器四个输入框 + 同步内容分组勾选 + 定时同步开关/间隔/方向 + 立即上传下载比对 + 状态与历史快照）。样式数值取自原生控件 getComputedStyle 实测，并在挂载时复读覆盖 CSS 变量；传输逻辑全部调用 webdav-core.js，不重写。",
+      "count": 1
+    },
+    {
+      "id": "W0-page",
+      "kind": "copy",
+      "from": "src/addons/webdav/js/webdav.js",
+      "to": "src/addons/webdav/js/webdav.js",
+      "why": "独立页逻辑：表单 ↔ chrome.storage.local 配置、按钮动作、host 权限申请、状态渲染。",
+      "count": 1
+    },
+    {
+      "id": "W0-sw",
+      "kind": "copy",
+      "from": "src/addons/webdav/js/webdav-sw.js",
+      "to": "src/addons/webdav/js/webdav-sw.js",
+      "why": "SW 侧引导：注册 chrome.alarms.onAlarm，页面关掉也能按时自动同步；异常全吞，不影响原 SW。",
+      "count": 1
+    },
+    {
+      "id": "W0-inject-legacy",
+      "kind": "copy",
+      "from": "src/addons/webdav/inject.js",
+      "to": "src/addons/webdav/inject.js",
+      "why": "v1 的浮动入口脚本。v2 起 config.html 不再引用它（W1 已换成 webdav-settings-panel.js），文件留在树里只为可回滚与对照；不加载 = 不渲染浮动按钮。",
+      "count": 1
+    },
+    {
+      "id": "W1-config-html",
+      "kind": "file",
+      "file": "html/config.html",
+      "old": "<!-- WebDAV 云同步入口：右下角浮动按钮，点击新标签打开 html/webdav.html -->\n<script type=\"text/javascript\" src=\"../src/addons/webdav/inject.js\"></script>\n</body>",
+      "new": "<!-- WebDAV 云同步：设置页内嵌「同步」栏（左侧导航项 + 内容区），已取消浮动入口 -->\n<script type=\"text/javascript\" src=\"../src/addons/webdav/js/webdav-core.js\"></script>\n<script type=\"text/javascript\" src=\"../src/addons/webdav/js/webdav-settings-panel.js\"></script>\n</body>",
+      "why": "唯一要改的既有页面。v1 在 </body> 前挂的是浮动按钮脚本；v2 换成「核心库 + 设置栏脚本」两个经典 script（按序执行，core 先就位）。原生 4 个 bundle 的加载顺序与 React 渲染完全不动。",
+      "count": 1
+    },
+    {
+      "id": "W2-manifest-hostperm",
+      "kind": "file",
+      "file": "manifest.json",
+      "old": "        \"*://*.akamaized.net/*\",\n        \"https://*.infini-cloud.net/*\"\n    ],\n    \"optional_host_permissions\": [\n        \"*://*/*\"\n    ],",
+      "new": "        \"*://*.akamaized.net/*\",\n        \"https://*.infini-cloud.net/*\"\n    ],\n    \"optional_host_permissions\": [\n        \"*://*/*\"\n    ],",
+      "why": "【已在 v1 落地，v2 原地复核】默认服务器 kurio.infini-cloud.net 需要 host 权限，否则扩展页 fetch 会被 CORS 挡（MV3 扩展页的跨域请求靠 host_permissions，不是靠 CORS 头）；optional_host_permissions 用于用户换成其它服务商时按需申请。r3 树里这段已经存在，所以 v2 的 old==new 是「状态断言 + 幂等写回」：count==1 证明 manifest 处于预期状态，写回字节不变，不会二次插入。",
+      "count": 1
+    },
+    {
+      "id": "W3-sw-bootstrap",
+      "kind": "file",
+      "file": "initBackground.sw.js",
+      "old": "var __webpack_exports__=__webpack_require__(5809)})();\n;(function(){try{if(self.importScripts){self.importScripts(\"src/addons/webdav/js/webdav-core.js\",\"src/addons/webdav/js/webdav-sw.js\")}}catch(e){console.warn(\"[webdav] SW bootstrap failed:\",e&&e.message||e)}})();",
+      "new": "var __webpack_exports__=__webpack_require__(5809)})();\n;(function(){try{if(self.importScripts){self.importScripts(\"src/addons/webdav/js/webdav-core.js\",\"src/addons/webdav/js/webdav-sw.js\")}}catch(e){console.warn(\"[webdav] SW bootstrap failed:\",e&&e.message||e)}})();",
+      "why": "【已在 v1 落地，v2 原地复核】chrome.alarms.onAlarm 必须在 Service Worker 里注册才会被唤醒；页面关着时 alarm 也能自动同步，靠的就是这段尾部引导（整段 try/catch，出问题不许把 SW 带崩）。r3 树里这段已经存在，v2 的 old==new 是幂等的状态断言 —— 关键是不能二次 append：重复 importScripts 会让 onAlarm 监听器注册两次，一个 alarm 触发两次同步。",
+      "count": 1
+    }
+  ],
+  "notes": [
+    "没有新增 web_accessible_resources 条目：html/webdav.html 是由扩展页面用 chrome.tabs.create 打开的，chrome-extension:// 顶层导航不需要 WAR；加 <all_urls> 只会让任意网站能 iframe 这个页面，没有任何收益。",
+    "不改 apply-all-patches.py / static-patchspec.py / proto-patch-spec.json / extra-patch-spec.json —— 那些属于其它角色的领土。本 spec 由 tools/feature-webdav-apply.py 独立应用。",
+    "远端目录固定落在 _acghelper/ 下（默认 _acghelper/settings/），探活用 _acghelper/settings/_probe/ 并即时清理，绝不遍历或触碰用户已有目录。",
+    "v2 的 W1 锚点带上了 v1 注入的那三行，所以它做的是「在已含 v1 WebDAV 的 r3 成品树上，把浮动入口换成设置栏」；对 38 条裸树请先跑 v1 再跑 v2，或直接用 r3 树。",
+    "设置栏脚本自带兜底：boot 时若发现老浮动入口 #__acg_webdav_entry__ 还在（例如树里同时留着 v1 的 inject.js），会把它摘掉并置 window.__ACG_WEBDAV_INJECTED__，保证页面上永远没有浮动按钮。"
+  ]
+}
