@@ -331,13 +331,14 @@ season 接口返回 `code:-101`（未登录）→ 入口不出现、面板子节
 
 | 项 | 实测 |
 | --- | --- |
-| 本次 profile 的 chrome 进程 `MainWindowHandle` | 11 个 PID 全 `=0`（`68532=0 75368=0 …`） |
-| `GetForegroundWindow` | 跑前 `2558864\|75968\|douyin` → 跑后 `2558864\|75968\|douyin`（**一致**）；另外全程 6 次采样（每次导航 + 收尾）里前台窗口从未落到本次 chrome 的 PID 集合 |
+| 本次 profile 的 chrome 进程 `MainWindowHandle` | 12 个 PID 全 `=0`（`79784=0 56016=0 65280=0 83056=0 73976=0 74908=0 83528=0 76304=0 52328=0 62852=0 78676=0 59520=0`） |
+| `GetForegroundWindow` | 跑前 `920898\|73248\|DeepSeek Harness` → 跑后 `1314354\|70876\|chrome`；全程 6 次采样（每次导航 + 收尾）的前台窗口**从未落到本次 chrome 的 PID 集合**里 |
 | `--mute-audio` + 清场 | 命令行含 `--mute-audio`；按 `--user-data-dir` 精确清场，残留 chrome 进程数 `=0`，profile 已删 |
 
-> 环境注记：有一次运行期间桌面前台被外部窗口接管（`QQ → DeepSeek Harness`），两个窗口都不在本次 chrome PID 集合内 ——
-> 那是宿主桌面活动。脚本因此把「前台 pid 不属于本次 chrome」作为**硬断言**（6 次采样全过），
-> 「跑前跑后完全一致」只作如实记录。
+> 环境注记（如实记录）：本轮运行期间桌面前台从 `DeepSeek Harness` 换成了 `chrome`（pid 70876），
+> 两个窗口都**不在**本次 headless chrome 的 PID 集合里 —— 那是宿主桌面活动，不是本脚本产生。
+> 脚本因此把「前台 pid 不属于本次 chrome」作为**硬断言**（6 次采样全过），「跑前跑后完全一致」只作如实记录。
+> 另有一次运行里跑前跑后确实完全一致（`2558864|75968|douyin` → 同值）。
 
 ---
 
@@ -489,7 +490,7 @@ python tools/apply-feature-batch.py --tree build/pre-batch --check
 # 3) 打补丁到测试树（不碰 output/）
 python tools/apply-feature-batch.py --tree build/pre-batch --out build/batch-inpanel-test
 
-# 4) 与 r3 的差异：必须只有 js/pages/acgx-batch.js
+# 4) 与成品树做逐字节回环：差异必须 = 0
 python tools/tree-diff.py "output\ACGhelper-2.8.31.16-unlock" "build\batch-inpanel-test"
 
 # 5) headless 五场景验收（A/B/C/D/E，50 条断言）
@@ -510,7 +511,7 @@ node tools/batch-inpanel-test.mjs --tree=build/batch-inpanel-test
 | 文件 | 状态 |
 | --- | --- |
 | `src/extracted/`（只读基准） | 未改（`_build-info.json` 里 `unchanged_before_after: true` 仍成立；本次构建根本没跑主构建器） |
-| `output/ACGhelper-2.8.31.16-unlock/`（r3 成品树） | 未改（`tree-diff` 只读比对；`Extensions.loadUnpacked` 只在 `build/` 副本上跑） |
+| `output/ACGhelper-2.8.31.16-unlock/`（成品树 r4） | 本特性未写入（`manifest.json` sha256 `C4C05F5C…` 全程未变）；`Extensions.loadUnpacked` 只在 `build/` 副本上跑。r4 里的 `js/pages/acgx-batch.js` 是主构建器从 `src/addons/batch/` 拷进去的 v2.0.0（sha256 `93e1a6c7…`），不是我直接改 `output/` |
 | `tools/apply-all-plus-features.py` | 未改 |
 | `tools/feature-webdav.json` / `feature-pgc-fix.json` / `feature-dash-auth-fix.json` / `feature-dash-fallback.json` | 未改 |
 | `src/addons/batch/js/pages/acgx-batch-offscreen.js` | 未改（下载/选流/串行/回执逻辑一行没动，sha256 `63d052d8fa0fc3f1…`） |
